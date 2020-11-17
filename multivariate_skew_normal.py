@@ -165,7 +165,7 @@ class multivariate_skew_normal_gen(multi_rv_generic):
         # first component, and ditch the first component
         # Note: transpose array back to proper shape
         z = np.transpose(np.sign(samples_y[0]) * samples_y[1:])
-        
+
         # Add location and scale
         samples = loc + np.matmul(z, np.diag(om_v))
 
@@ -241,125 +241,69 @@ class multivariate_skew_normal_gen(multi_rv_generic):
         vector, handle defaults, and ensure compatible dimensions.
         """
         if loc is None and scale is None:
-            # check shape vector
             if shape is None:
-                shape = np.zeros(1, dtype=float)
+                loc = np.asarray(0, dtype=float)
+                scale = np.asarray(1, dtype=float)
+                shape = np.asarray(0, dtype=float)
                 dim = 1
             else:
                 shape = np.asarray(shape, dtype=float)
-
-                # check dims
-                if shape.ndim > 1:
-                    if shape.ndim == 2 and shape.shape[1] == 1:
-                        shape.shape = (shape.shape[0],)
-                    else:
-                        raise ValueError("Array 'shape' must be a vector.")
-                elif shape.ndim == 0:
-                    shape.shape = (1,)
-
-                dim = shape.shape[0]
-
-            # create default loc and scale arays
-            loc = np.zeros(dim, dtype=float)
-            scale = np.eye(dim, dtype=float)
-
-        elif loc is None:  # and scale is not None
-            # infer dimensions and check correctness
-            scale = np.asarray(scale, dtype=float)
-
-            # check dims
-            if scale.ndim < 2:
-                dim = 1
-                scale.shape = (1, 1)
-            elif scale.ndim > 2:
-                raise ValueError("Array 'scale' must be at most"
-                                 " two-dimensional, but scale.ndim = %d" %
-                                 scale.ndim)
-            if scale.shape[0] != scale.shape[1]:
-                raise ValueError("Array 'scale' must be square if it is"
-                                 " two-dimensional, but scale.shape = %s." %
-                                 str(scale.shape))
-
-            #  create default loc vector
-            dim = scale.shape[0]
-            loc = np.zeros(dim)
-
-            # check shape vector
-            if shape is None:
-                shape = np.zeros(dim)
-            else:
-                shape = np.asarray(shape, dtype=float)
-
-                # check dims
-                if shape.ndim > 1:
-                    if shape.ndim == 2 and shape.shape[1] == 1:
-                        shape.shape = (shape.shape[0],)
-                    else:
-                        raise ValueError("Array 'shape' must be a vector.")
-                elif shape.ndim == 0:
-                    shape.shape = (1,)
-                if dim != len(shape):
-                    raise ValueError("Dimension mismatch: array 'scale' is of"
-                                     " shape %s, but 'shape' is a vector of"
-                                     " length %d." % (str(scale.shape),
-                                                      len(shape)))
-
-        else:
-            # loc is not None
-            loc = np.asarray(loc, dtype=float)
-
-            # check dims
-            if loc.ndim > 1:
-                if loc.ndim == 2 and loc.shape[1] == 1:
-                    loc.shape = (loc.shape[0],)
+                if shape.ndim == 0:
+                    dim = 1
+                elif shape.ndim == 1:
+                    dim = len(shape)
                 else:
-                    raise ValueError("Array 'loc' must be a vector.")
-            elif loc.ndim == 0:
-                loc.shape = (1,)
-
-            dim = loc.shape[0]
-
-            # check scale array
-            if scale is None:
+                    raise ValueError("Array 'shape' must be scalr or vector, "
+                                     "instead it has shape %s." % shape.shape)
+                loc = np.zeros(dim)
                 scale = np.eye(dim)
+        elif scale is None:
+            loc = np.asaray(loc, dtype=float)
+            dim = loc.size
+            scale = np.eye(dim)
+            if shape is None:
+                shape = np.zeros(dim)
             else:
-                scale = np.asarray(scale, dtype=float)
-
-                # check dims
-                if scale.ndim < 2:
-                    scale.shape = (1, 1)
-                elif scale.ndim > 2:
-                    raise ValueError("Array 'scale' must be at most"
-                                     " two-dimensional, but scale.ndim = %d" %
-                                     scale.ndim)
-                if scale.shape[0] != dim:
-                    raise ValueError("Dimension mismatch: array 'scale' is of"
-                                     " shape %s, but 'loc' is a vector of"
-                                     " length %d." % (str(scale.shape), dim))
-                if scale.shape[0] != scale.shape[1]:
-                    raise ValueError("Array 'scale' must be square if it is"
-                                     " two-dimensional, but scale.shape = %s." %
-                                     str(scale.shape))
-
-            # check shape vector
+                shape = np.asarray(shape, dtype=float)
+        else:
+            loc = np.asarray(loc, dtype=float)
+            dim = loc.size
+            scale = np.asarray(scale, dtype=float)
             if shape is None:
                 shape = np.zeros(dim)
             else:
                 shape = np.asarray(shape, dtype=float)
 
-                # check dims
-                if shape.ndim > 1:
-                    if shape.ndim == 2 and shape.shape[1] == 1:
-                        shape.shape = (shape.shape[0],)
-                    else:
-                        raise ValueError("Array 'shape' must be a vector.")
-                elif shape.ndim == 0:
-                    shape.shape = (1,)
-                if dim != len(shape):
-                    raise ValueError("Dimension mismatch: array 'scale' is of"
-                                     " shape %s, but 'shape' is a vector of"
-                                     " length %d." % (str(scale.shape),
-                                                      len(shape)))
+        if dim == 1:
+            loc.shape = (1,)
+            scale.shape = (1, 1)
+            shape.shape = (1,)
+
+        if loc.ndim != 1 or loc.shape[0] != dim:
+            raise ValueError("Array 'loc' must be a vector of length %d." %
+                             dim)
+
+        if scale.ndim == 0:
+            scale = scale * np.eye(dim)
+        elif scale.ndim == 1:
+            scale = np.diag(scale)
+        elif scale.ndim == 2 and scale.shape != (dim, dim):
+            rows, cols = scale.shape
+            if rows != cols:
+                msg = ("Array 'cov' must be square if it is two dimensional,"
+                       " but cov.shape = %s." % str(scale.shape))
+            else:
+                msg = ("Dimension mismatch: array 'cov' is of shape %s,"
+                       " but 'loc' is a vector of length %d.")
+                msg = msg % (str(scale.shape), len(loc))
+            raise ValueError(msg)
+        elif scale.ndim > 2:
+            raise ValueError("Array 'cov' must be at most two-dimensional,"
+                             " but cov.ndim = %d" % scale.ndim)
+
+        if shape.ndim != 1 or shape.shape[0] != dim:
+            raise ValueError("Array 'shape' must be a vector of length %d." %
+                             dim)
 
         # check for Inf & NaN values in shape vector
         if not np.isfinite(shape).all():

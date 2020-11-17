@@ -57,7 +57,7 @@ class multivariate_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
 
         if np.inf == df:
             # multivariate normal distribution
@@ -80,7 +80,7 @@ class multivariate_t_gen(multi_rv_generic):
         x : array_like
             Points at which to evaluate the log of the probability density
             function.
-        df : int or float 
+        df : int or float
             Degrees of freedom.
         loc : array_like, optional
             Mean of the distribution (default zero).
@@ -96,7 +96,7 @@ class multivariate_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
 
         if np.inf == df:
             # multivariate normal distribution
@@ -131,7 +131,7 @@ class multivariate_t_gen(multi_rv_generic):
 
         Parameters
         ----------
-        df : int or float 
+        df : int or float
             Degrees of freedom.
         loc : array_like, optional
             Mean of the distribution (default zero).
@@ -151,7 +151,7 @@ class multivariate_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
         dim, loc, scale = self._process_parameters(loc, scale)
 
         if random_state is not None:
@@ -172,7 +172,7 @@ class multivariate_t_gen(multi_rv_generic):
                                     size=size)  # (n,d)
         # add location and scale
         samples = loc + z / np.sqrt(x)[:, None]
-        
+
         return _squeeze_output(samples)
 
     def dpdf(self, x, df, loc=None, scale=1):
@@ -184,7 +184,7 @@ class multivariate_t_gen(multi_rv_generic):
         x : array_like
             Points at which to evaluate the log of the probability density
             function.
-        df : int or float 
+        df : int or float
             Degrees of freedom.
         loc : array_like, optional
             Mean of the distribution (default zero).
@@ -200,7 +200,7 @@ class multivariate_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
         dim, loc, scale = self._process_parameters(loc, scale)
         x = self._process_quantiles(x, dim)
         scale_info = _PSD(scale)
@@ -254,16 +254,21 @@ class multivariate_t_gen(multi_rv_generic):
         """Make sure degrees of freedom are valid. Separate treatment to
         avoid duplication of code when df == np.inf
         """
-        if not (isinstance(df, (int,float)) and df > 0):
-            raise ValueError("'df' must be a positive integer or 'np.inf' "
-                             "but is of type %s" % type(df) + " and value "
-                             "%s" % str(df))
+        if df is None:
+            df = 1
+        elif df <= 0:
+            raise ValueError("'df' must be greater than zero.")
+        elif np.isnan(df):
+            raise ValueError("'df' is 'nan' but must be greater than zero or 'np.inf'.")
+
+        return df
 
     def _process_parameters(self, loc, scale):
         """Infer dimensionality from loc array and scale matrix, handle
         defaults, and ensure compatible dimensions.
         """
         if loc is None and scale is None:
+            loc = np.asarray(0, dtype=float)
             scale = np.asarray(1, dtype=float)
             dim = 1
         elif loc is None:
@@ -273,12 +278,15 @@ class multivariate_t_gen(multi_rv_generic):
             else:
                 dim = scale.shape[0]
             loc = np.zeros(dim)
+        elif scale is None:
+            loc = np.asarray(loc, dtype=float)
+            dim = loc.size
+            scale = np.eye(dim)
         else:
             scale = np.asarray(scale, dtype=float)
             loc = np.asarray(loc, dtype=float)
             dim = loc.size
 
-        # FIXME: Why is this here?
         if dim == 1:
             loc.shape = (1,)
             scale.shape = (1, 1)
@@ -293,16 +301,16 @@ class multivariate_t_gen(multi_rv_generic):
         elif scale.ndim == 2 and scale.shape != (dim, dim):
             rows, cols = scale.shape
             if rows != cols:
-                msg = ("Array 'scale' must be square if it is two dimensional,"
-                       " but scale.shape = %s." % str(scale.shape))
+                msg = ("Array 'cov' must be square if it is two dimensional,"
+                       " but cov.shape = %s." % str(scale.shape))
             else:
-                msg = ("Dimension mismatch: array 'scale' is of shape %s,"
+                msg = ("Dimension mismatch: array 'cov' is of shape %s,"
                        " but 'loc' is a vector of length %d.")
                 msg = msg % (str(scale.shape), len(loc))
             raise ValueError(msg)
         elif scale.ndim > 2:
-            raise ValueError("Array 'scale' must be at most two-dimensional,"
-                             " but scale.ndim = %d" % scale.ndim)
+            raise ValueError("Array 'cov' must be at most two-dimensional,"
+                             " but cov.ndim = %d" % scale.ndim)
 
         return dim, loc, scale
 
@@ -331,7 +339,7 @@ class multivariate_t_frozen(multi_rv_frozen):
         FIXME.
         """
         self._dist = multivariate_t_gen(seed)
-        self._dist._process_degrees_of_freedom(df)
+        df = self._dist._process_degrees_of_freedom(df)
         dim, loc, scale = self._dist._process_parameters(loc, scale)
         self.dim, self.df, self.loc, self.scale = dim, df, loc, scale
         self.scale_info = _PSD(scale)

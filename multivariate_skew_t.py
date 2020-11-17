@@ -63,7 +63,7 @@ class multivariate_skew_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
 
         if np.inf == df:
             # multivariate skew-normal distribution
@@ -108,7 +108,7 @@ class multivariate_skew_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
 
         if np.inf == df:
             # multivariate skew-normal distribution
@@ -139,12 +139,12 @@ class multivariate_skew_t_gen(multi_rv_generic):
         C = dim/2. * np.log(df * np.pi)
         D = 0.5 * log_pdet
         E = -t * np.log(1 + (1./df) * maha)
-        
+
         log_t = A - B - C - D + E
-        
+
         # factor of log 2
         F = np.log(2)
-        
+
         # log cdf of reparametrized univariate t distribution
         ss = shape / np.sqrt(scale_diag)  # (d,)
         L = np.dot(dev, ss)  # (n,)
@@ -183,7 +183,7 @@ class multivariate_skew_t_gen(multi_rv_generic):
         --------
         FIXME.
         """
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
         dim, loc, scale, shape = self._process_parameters(loc, scale, shape)
 
         if random_state is not None:
@@ -199,15 +199,15 @@ class multivariate_skew_t_gen(multi_rv_generic):
         else:
             # generic multivariate t-distribution
             x = rng.chisquare(df, size=size) / df
-        
+
         z = multivariate_skew_normal.rvs(loc=np.zeros(dim), scale=scale,
                                          shape=shape, size=size,
                                          random_state=rng)
         # z has dimensions squeezed, so we need to promote to 2D
-        z = self._process_quantiles(z, dim)  # (n,d)        
+        z = self._process_quantiles(z, dim)  # (n,d)
         # add location and scale
         samples = loc + z / np.sqrt(x)[:, None]
-        
+
         return _squeeze_output(samples)
 
     def dpdf(self, x, df, loc=None, scale=1, shape=0):
@@ -238,8 +238,8 @@ class multivariate_skew_t_gen(multi_rv_generic):
         FIXME.
 
         """
-        self._process_degrees_of_freedom(df)
-        
+        df = self._process_degrees_of_freedom(df)
+
         if np.inf == df:
             # multivariate skew-normal distribution
             out = multivariate_skew_normal.dpdf(x, loc=loc, scale=scale,
@@ -251,10 +251,10 @@ class multivariate_skew_t_gen(multi_rv_generic):
             x = self._process_quantiles(x, dim)
             scale_info = _PSD(scale)
             scale_diag = np.diag(scale)
-            
-            # generic multivariate skew-t-distribution, step by step, 
+
+            # generic multivariate skew-t-distribution, step by step,
             # using the product rule for the gradient
-            
+
             # first term contains derivative of regular multivariate t
             dev = x - loc  # (n,d)
             maha = np.square(np.dot(dev, scale_info.U)).sum(axis=-1)  # (n,)
@@ -265,36 +265,36 @@ class multivariate_skew_t_gen(multi_rv_generic):
             C = dim/2. * np.log(df * np.pi)
             D = 0.5 * scale_info.log_pdet
             E = -(t+1) * np.log(1 + (1./df) * maha)  # (n,)
-            
+
             ss = shape / np.sqrt(scale_diag)  # (d,)
-            
+
             # logcdf of univariate student t distribution
             L = np.dot(dev, ss)  # (n,)
             weight = np.sqrt((df + dim) / (df + maha))  # (n,)
             z = weight * L  # (n,)
             F = student_t.logcdf(z, df + dim)  # (n,)
-            
+
             sm = np.dot(dev, scale_info.pinv)  # (n,d)
-            
+
             # First term of product rule
             left = -2. * t / df * np.transpose(
                 np.transpose(sm) * np.exp(A - B - C - D + E + F))  # (n,d)
-            
-            # second term is 2 * multivariate t * univariate t 
+
+            # second term is 2 * multivariate t * univariate t
             # reparametrized * derivative of reparametrization, so we can
             # reuse a lot of values
-            
+
             G = -t * np.log(1 + (1./df) * maha)  # (n,)
-            
+
             # TODO: could be done explicitly to save some computation
             H = student_t.logpdf(z, df + dim)  # (n,)
-            
+
             t_d_times_t_1_cdf = np.exp(A - B - C - D + G + H)  # (n,)
-            
+
             # now we compute the derivative of reparametrization parts
             J = -0.5 * np.sqrt((df + dim) / (df + maha)**3)  # (n,)
             K = np.sqrt((df + dim) / (df + maha))  # (n,)
-            
+
             # Second term of product rule
             tmp = (
                 np.transpose(np.transpose(sm) * (J * z))  # (n,d)
@@ -319,140 +319,88 @@ class multivariate_skew_t_gen(multi_rv_generic):
             else:
                 x = x[np.newaxis, :]
         return x
-    
+
     def _process_degrees_of_freedom(self, df):
         """Make sure degrees of freedom are valid. Separate treatment to
         avoid duplication of code when df == np.inf
         """
-        if not (isinstance(df, (int,float)) and df > 0):
-            raise ValueError("'df' must be a positive integer or 'np.inf' "
-                             "but is of type %s" % type(df) + " and value "
-                             "%s" % str(df))
+        if df is None:
+            df = 1
+        elif df <= 0:
+            raise ValueError("'df' must be greater than zero.")
+        elif np.isnan(df):
+            raise ValueError("'df' is 'nan' but must be greater than zero or 'np.inf'.")
+
+        return df
 
     def _process_parameters(self, loc, scale, shape):
         """Infer dimensionality from location vector, scale matrix, and shape
         vector, handle defaults, and ensure compatible dimensions.
         """
         if loc is None and scale is None:
-            # check shape vector
             if shape is None:
-                shape = np.zeros(1, dtype=float)
+                loc = np.asarray(0, dtype=float)
+                scale = np.asarray(1, dtype=float)
+                shape = np.asarray(0, dtype=float)
                 dim = 1
             else:
                 shape = np.asarray(shape, dtype=float)
-
-                # check dims
-                if shape.ndim > 1:
-                    if shape.ndim == 2 and shape.shape[1] == 1:
-                        shape.shape = (shape.shape[0],)
-                    else:
-                        raise ValueError("Array 'shape' must be a vector.")
-                elif shape.ndim == 0:
-                    shape.shape = (1,)
-
-                dim = shape.shape[0]
-
-            # create default loc and scale arays
-            loc = np.zeros(dim, dtype=float)
-            scale = np.eye(dim, dtype=float)
-
-        elif loc is None:  # and scale is not None
-            # infer dimensions and check correctness
-            scale = np.asarray(scale, dtype=float)
-
-            # check dims
-            if scale.ndim < 2:
-                dim = 1
-                scale.shape = (1, 1)
-            elif scale.ndim > 2:
-                raise ValueError("Array 'scale' must be at most"
-                                 " two-dimensional, but scale.ndim = %d" %
-                                 scale.ndim)
-            if scale.shape[0] != scale.shape[1]:
-                raise ValueError("Array 'scale' must be square if it is"
-                                 " two-dimensional, but scale.shape = %s." %
-                                 str(scale.shape))
-
-            #  create default loc vector
-            dim = scale.shape[0]
-            loc = np.zeros(dim)
-
-            # check shape vector
-            if shape is None:
-                shape = np.zeros(dim)
-            else:
-                shape = np.asarray(shape, dtype=float)
-
-                # check dims
-                if shape.ndim > 1:
-                    if shape.ndim == 2 and shape.shape[1] == 1:
-                        shape.shape = (shape.shape[0],)
-                    else:
-                        raise ValueError("Array 'shape' must be a vector.")
-                elif shape.ndim == 0:
-                    shape.shape = (1,)
-                if dim != len(shape):
-                    raise ValueError("Dimension mismatch: array 'scale' is of"
-                                     " shape %s, but 'shape' is a vector of"
-                                     " length %d." % (str(scale.shape),
-                                                      len(shape)))
-
-        else:
-            # loc is not None
-            loc = np.asarray(loc, dtype=float)
-
-            # check dims
-            if loc.ndim > 1:
-                if loc.ndim == 2 and loc.shape[1] == 1:
-                    loc.shape = (loc.shape[0],)
+                if shape.ndim == 0:
+                    dim = 1
+                elif shape.ndim == 1:
+                    dim = len(shape)
                 else:
-                    raise ValueError("Array 'loc' must be a vector.")
-            elif loc.ndim == 0:
-                loc.shape = (1,)
-
-            dim = loc.shape[0]
-
-            # check scale array
-            if scale is None:
+                    raise ValueError("Array 'shape' must be scalr or vector, "
+                                     "instead it has shape %s." % shape.shape)
+                loc = np.zeros(dim)
                 scale = np.eye(dim)
+        elif scale is None:
+            loc = np.asaray(loc, dtype=float)
+            dim = loc.size
+            scale = np.eye(dim)
+            if shape is None:
+                shape = np.zeros(dim)
             else:
-                scale = np.asarray(scale, dtype=float)
-
-                # check dims
-                if scale.ndim < 2:
-                    scale.shape = (1, 1)
-                elif scale.ndim > 2:
-                    raise ValueError("Array 'scale' must be at most"
-                                     " two-dimensional, but scale.ndim = %d" %
-                                     scale.ndim)
-                if scale.shape[0] != dim:
-                    raise ValueError("Dimension mismatch: array 'scale' is of"
-                                     " shape %s, but 'loc' is a vector of"
-                                     " length %d." % (str(scale.shape), dim))
-                if scale.shape[0] != scale.shape[1]:
-                    raise ValueError("Array 'scale' must be square if it is"
-                                     " two-dimensional, but scale.shape = %s." %
-                                     str(scale.shape))
-
-            # check shape vector
+                shape = np.asarray(shape, dtype=float)
+        else:
+            loc = np.asarray(loc, dtype=float)
+            dim = loc.size
+            scale = np.asarray(scale, dtype=float)
             if shape is None:
                 shape = np.zeros(dim)
             else:
                 shape = np.asarray(shape, dtype=float)
 
-                # check dims
-                if shape.ndim > 1:
-                    if shape.ndim == 2 and shape.shape[1] == 1:
-                        shape.shape = (shape.shape[0],)
-                    else:
-                        raise ValueError("Array 'shape' must be a vector.")
-                elif shape.ndim == 0:
-                    shape.shape = (1,)
-                if dim != len(shape):
-                    raise ValueError("Dimension mismatch: array 'scale' is of"
-                                     " shape %s, but 'shape' is a vector of"
-                                     " length %d." % (str(scale.shape),
-                                                      len(shape)))
+        if dim == 1:
+            loc.shape = (1,)
+            scale.shape = (1, 1)
+            shape.shape = (1,)
+
+        if loc.ndim != 1 or loc.shape[0] != dim:
+            raise ValueError("Array 'loc' must be a vector of length %d." %
+                             dim)
+
+        if scale.ndim == 0:
+            scale = scale * np.eye(dim)
+        elif scale.ndim == 1:
+            scale = np.diag(scale)
+        elif scale.ndim == 2 and scale.shape != (dim, dim):
+            rows, cols = scale.shape
+            if rows != cols:
+                msg = ("Array 'cov' must be square if it is two dimensional,"
+                       " but cov.shape = %s." % str(scale.shape))
+            else:
+                msg = ("Dimension mismatch: array 'cov' is of shape %s,"
+                       " but 'loc' is a vector of length %d.")
+                msg = msg % (str(scale.shape), len(loc))
+            raise ValueError(msg)
+        elif scale.ndim > 2:
+            raise ValueError("Array 'cov' must be at most two-dimensional,"
+                             " but cov.ndim = %d" % scale.ndim)
+
+        if shape.ndim != 1 or shape.shape[0] != dim:
+            raise ValueError("Array 'shape' must be a vector of length %d." %
+                             dim)
 
         # check for Inf & NaN values in shape vector
         if not np.isfinite(shape).all():
@@ -489,7 +437,7 @@ class multivariate_skew_t_frozen(multi_rv_frozen):
         FIXME.
         """
         self._dist = multivariate_skew_t_gen(seed)
-        self._process_degrees_of_freedom(df)
+        df = self._process_degrees_of_freedom(df)
         dim, loc, scale, shape = self._dist._process_parameters(loc, scale, shape)
         self.dim, self.df, self.loc, self.scale, self.shape = dim, df, loc, scale, shape
         self.scale_info = _PSD(scale)
