@@ -4,11 +4,13 @@ Python implementations for multivariate skew distributions
 The multivariate t distribution implementation is based on the code of Gregory Gunderson: https://github.com/gwgundersen/multivariate-t-distribution. 
 While the code in this repo was being developed, a version of Gunderson's code was merged into SciPy (Oct. 2020: https://github.com/scipy/scipy/pull/12582). 
 More details of that version of the code can be found on Gunderson's blog: http://gregorygundersen.com/blog/2020/01/20/multivariate-t/.
-The version in this repo contains some small improvements (e.g. computing also the gradient of the pdf) and changes to function signatures which seemed more in line with existing SciPy code.
+The version in this repo contains some small improvements (e.g. computing also the gradient of the pdf) and changes to function signatures which seemed more in line with the rest of the existing SciPy code. 
 
 The skew versions of the multivariate t and normal distributions have an implementation that matches closely the scipy.stats style/signatures. Additionaly, implementations for computing the gradient of the pdf have been added (which is something not implemented for any distribution in scipy.stats).
 
 The IPython notebook presents the mathematical descriptions and tests to validate the implementations.
+
+The merge of these changes to SciPy will be part of a separate, subsequent effort, which will require more steps than the simple integration of the new code. If any such additions to SciPy shall at some point occur, this repository may become obsolete. In any case, it is always recommended to first and foremost use any available SciPy functionality before looking for alternative implementations.
 
 The software is supplied "as is" without warranty of any kind, and the author(s) disclaim any and all warranties, including but not limited to any implied warranties of merchantability and fitness for a particular purpose, and any warranties or non infringement. The user assumes all liability and responsibility for use of the software and in no event shall the author(s) be liable for damages of any kind resulting from its use.
 
